@@ -1,6 +1,7 @@
 # json-parser
 
-A simple json parser in rust
+A simple json parser in rust, I do the lexing manually, for parsing implemented a simple recursive descent parser
+The grammar i used can be found [here](./json-grammar.md)
 
 ## Showcase
 
