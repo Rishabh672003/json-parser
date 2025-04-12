@@ -1,0 +1,45 @@
+{
+	"id": "2489651756",
+	"type": "PushEvent",
+	"actor": {
+		"id": 993322,
+		"login": "qiangxue",
+		"gravatar_id": "",
+		"url": "https://api.github.com/users/qiangxue",
+		"avatar_url": "https://avatars.githubusercontent.com/u/993322?"
+	},
+	"repo": {
+		"id": 14080265,
+		"name": "yiisoft/yii2-bootstrap",
+		"url": "https://api.github.com/repos/yiisoft/yii2-bootstrap"
+	},
+	"payload": {
+		"push_id": 536864301,
+		"size": 1,
+		"distinct_size": 1,
+		"ref": "refs/heads/master",
+		"head": "43b808a9d799d9b08dca5790722d1b51196e7e25",
+		"before": "1b5ddfc0a5faa907b23add91bf8691fb041492f4",
+		"commits": [
+			{
+				"sha": "43b808a9d799d9b08dca5790722d1b51196e7e25",
+				"author": {
+					"email": "4d681006a0a61cdec5c496212b1ec8571dd0b4c7@gmail.com",
+					"name": "Qiang Xue"
+				},
+				"message": "Fixes #6672: `yii\\cootstrap\\Dropdown` should register client event handlers",
+				"distinct": true,
+				"url": "https://api.github.com/repos/yiisoft/yii2-bootstrap/commits/43b808a9d799d9b08dca5790722d1b51196e7e25"
+			}
+		]
+	},
+	"public": true,
+	"created_at": "2015-01-01T15:01:27Z",
+	"org": {
+		"id": 993323,
+		"login": "yiisoft",
+		"gravatar_id": "",
+		"url": "https://api.github.com/orgs/yiisoft",
+		"avatar_url": "https://avatars.githubusercontent.com/u/993323?"
+	}
+}
