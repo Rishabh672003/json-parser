@@ -9,6 +9,7 @@ The grammar i used can be found [here](./json-grammar.md)
 
 ![image](https://github.com/user-attachments/assets/0851d38c-b895-4120-b7e3-3c4175fa5699)
 
-Tested on a 6k line JSON file
+Tested on a 700k line JSON [file](./test-json/huge.json)
 
-![image](https://github.com/user-attachments/assets/14e90216-9ecd-4ae3-a351-393ec7fa5761)
+![image](https://github.com/user-attachments/assets/268d49a2-9318-4a37-a824-2b5e001111ed)
+
