@@ -177,24 +177,24 @@ pub mod parser {
     use crate::lexer::Token;
 
     #[derive(Debug, Clone, PartialEq, PartialOrd)]
-    pub enum GrammarItem {
+    pub enum GrammarItem<'a> {
         Json,
         Value,
         Object,
-        Member(String),
+        Member(&'a str),
         Members,
         Array,
         Element,
         Elements,
         Number(f64),
         Bool(bool),
-        StrLit(String),
+        StrLit(&'a str),
         Null,
     }
 
     use std::fmt;
 
-    impl fmt::Display for ParseNode {
+    impl fmt::Display for ParseNode<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "{}", self.entry)?;
             write!(f, "{{")?;
@@ -206,7 +206,7 @@ pub mod parser {
         }
     }
 
-    impl fmt::Display for GrammarItem {
+    impl fmt::Display for GrammarItem<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 GrammarItem::Json => write!(f, "Json "),
@@ -226,12 +226,12 @@ pub mod parser {
     }
 
     #[derive(Debug, Clone, PartialEq, PartialOrd)]
-    pub struct ParseNode {
-        pub entry: GrammarItem,
-        pub children: Vec<ParseNode>,
+    pub struct ParseNode<'a> {
+        pub entry: GrammarItem<'a>,
+        pub children: Vec<ParseNode<'a>>,
     }
 
-    impl ParseNode {
+    impl ParseNode<'_> {
         pub fn new(entry: GrammarItem) -> ParseNode {
             ParseNode {
                 entry,
@@ -281,10 +281,7 @@ pub mod parser {
                 let (parsenode, pos) = parse_array(toks, pos)?;
                 Ok((parsenode, pos))
             }
-            Token::StringLiteral(val) => Ok((
-                ParseNode::new(GrammarItem::StrLit(val.to_string())),
-                pos + 1,
-            )),
+            Token::StringLiteral(val) => Ok((ParseNode::new(GrammarItem::StrLit(val)), pos + 1)),
             Token::Number(number) => Ok((ParseNode::new(GrammarItem::Number(*number)), pos + 1)),
             Token::True => Ok((ParseNode::new(GrammarItem::Bool(true)), pos + 1)),
             Token::False => Ok((ParseNode::new(GrammarItem::Bool(false)), pos + 1)),
@@ -348,7 +345,7 @@ pub mod parser {
         };
         let pos = pos + 1;
         let (parsenode, pos) = parse_element(toks, pos)?;
-        let mut node = ParseNode::new(GrammarItem::Member(cur_token.to_owned()));
+        let mut node = ParseNode::new(GrammarItem::Member(cur_token));
         node.children.push(parsenode);
         Ok((node, pos))
     }
@@ -395,7 +392,7 @@ fn main() {
     let file_content = std::fs::read_to_string(file).unwrap();
     let toks = lexer::tokenize(&file_content).unwrap();
     // println!("{:?}", toks);
-    let ans = parser::parse(&toks).unwrap();
+    let _ans = parser::parse(&toks).unwrap();
     // println!("{}", ans);
 }
 
