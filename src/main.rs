@@ -68,15 +68,12 @@ pub mod lexer {
                 }
                 '"' => {
                     chars.next();
-                    let mut v = Vec::new();
+                    let mut v = String::with_capacity(32);
                     let mut escaping = false;
 
                     while let Some(&c) = chars.peek() {
                         if !('\u{0020}'..='\u{10FFFF}').contains(&c) {
-                            return Err(format!(
-                                "Invalid Character: {c}, {}",
-                                v.iter().collect::<String>()
-                            ));
+                            return Err(format!("Invalid Character: {c}, {}", v));
                         }
                         chars.next();
                         if escaping {
@@ -85,10 +82,7 @@ pub mod lexer {
                                     v.push(c);
                                 }
                                 _ => {
-                                    return Err(format!(
-                                        "Invalid Escape sequence: {c}, {}",
-                                        v.iter().collect::<String>()
-                                    ));
+                                    return Err(format!("Invalid Escape sequence: {c}, {}", v));
                                 }
                             }
                             escaping = false;
@@ -103,12 +97,9 @@ pub mod lexer {
                     }
 
                     if escaping {
-                        return Err(format!(
-                            "Unterminated escape sequence: {}",
-                            v.iter().collect::<String>()
-                        ));
+                        return Err(format!("Unterminated escape sequence: {}", v));
                     }
-                    toks.push(Token::StringLiteral(v.iter().collect()));
+                    toks.push(Token::StringLiteral(v));
                 }
                 ':' => {
                     toks.push(Token::Colon);
@@ -176,7 +167,7 @@ pub mod lexer {
 pub mod parser {
     use crate::lexer::Token;
 
-    #[derive(Debug, Clone, PartialEq, PartialOrd)]
+    #[derive(Debug, PartialEq, PartialOrd)]
     pub enum GrammarItem<'a> {
         Json,
         Value,
@@ -225,7 +216,7 @@ pub mod parser {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, PartialOrd)]
+    #[derive(Debug, PartialEq, PartialOrd)]
     pub struct ParseNode<'a> {
         pub entry: GrammarItem<'a>,
         pub children: Vec<ParseNode<'a>>,
@@ -240,7 +231,7 @@ pub mod parser {
         }
     }
 
-    pub fn parse(toks: &Vec<Token>) -> Result<ParseNode, String> {
+    pub fn parse(toks: &[Token]) -> Result<ParseNode, String> {
         parse_json(toks, 0).and_then(|(n, i)| {
             if i == toks.len() {
                 Ok(n)
@@ -253,44 +244,47 @@ pub mod parser {
         })
     }
 
-    fn parse_json(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
+    fn parse_json(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
         let (parsenode, pos) = parse_element(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Json);
         node.children.push(parsenode);
         Ok((node, pos))
     }
 
-    fn parse_element(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
+    fn parse_element(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
         let (parsenode, pos) = parse_value(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Element);
         node.children.push(parsenode);
         Ok((node, pos))
     }
 
-    fn parse_value(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
-        let c = toks
-            .get(pos)
-            .ok_or_else(|| format!("Expected A value, found None, at position: {pos}"))?;
+    fn parse_value(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
+        let c = toks.get(pos);
 
         match c {
-            Token::OpeningCurlyBrace => {
+            Some(Token::OpeningCurlyBrace) => {
                 let (parsenode, pos) = parse_object(toks, pos)?;
                 Ok((parsenode, pos))
             }
-            Token::OpeningSquareBrace => {
+            Some(Token::OpeningSquareBrace) => {
                 let (parsenode, pos) = parse_array(toks, pos)?;
                 Ok((parsenode, pos))
             }
-            Token::StringLiteral(val) => Ok((ParseNode::new(GrammarItem::StrLit(val)), pos + 1)),
-            Token::Number(number) => Ok((ParseNode::new(GrammarItem::Number(*number)), pos + 1)),
-            Token::True => Ok((ParseNode::new(GrammarItem::Bool(true)), pos + 1)),
-            Token::False => Ok((ParseNode::new(GrammarItem::Bool(false)), pos + 1)),
-            Token::Null => Ok((ParseNode::new(GrammarItem::Null), pos + 1)),
+            Some(Token::StringLiteral(val)) => {
+                Ok((ParseNode::new(GrammarItem::StrLit(val)), pos + 1))
+            }
+            Some(Token::Number(number)) => {
+                Ok((ParseNode::new(GrammarItem::Number(*number)), pos + 1))
+            }
+            Some(Token::True) => Ok((ParseNode::new(GrammarItem::Bool(true)), pos + 1)),
+            Some(Token::False) => Ok((ParseNode::new(GrammarItem::Bool(false)), pos + 1)),
+            Some(Token::Null) => Ok((ParseNode::new(GrammarItem::Null), pos + 1)),
+            None => Err(format!("Expected a value, found None at position: {pos}")),
             _ => Err(format!("Invalid token: {:?} at potition: {pos}", c)),
         }
     }
 
-    fn parse_object(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
+    fn parse_object(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
         let mut node = ParseNode::new(GrammarItem::Object);
         if let Some(Token::ClosingCurlyBrace) = toks.get(pos + 1) {
             Ok((node, pos + 2))
@@ -310,7 +304,7 @@ pub mod parser {
         }
     }
 
-    fn parse_members(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
+    fn parse_members(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
         let (parsenode, pos) = parse_member(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Members);
         node.children.push(parsenode);
@@ -323,7 +317,7 @@ pub mod parser {
         Ok((node, cur_pos))
     }
 
-    fn parse_member(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
+    fn parse_member(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
         let Token::StringLiteral(cur_token) = toks
             .get(pos)
             .ok_or_else(|| "Unexpected End of input".to_string())?
@@ -350,7 +344,7 @@ pub mod parser {
         Ok((node, pos))
     }
 
-    fn parse_array(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
+    fn parse_array(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
         let mut node = ParseNode::new(GrammarItem::Array);
         if let Some(Token::ClosingSquareBrace) = toks.get(pos + 1) {
             Ok((node, pos + 2))
@@ -370,7 +364,7 @@ pub mod parser {
         }
     }
 
-    fn parse_elements(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
+    fn parse_elements(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
         let (parsenode, pos) = parse_element(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Elements);
         node.children.push(parsenode);
@@ -384,16 +378,23 @@ pub mod parser {
     }
 }
 
+fn timeit<T, F: FnOnce() -> T>(label: &str, f: F) -> T {
+    use std::time::Instant;
+    let start = Instant::now();
+    let result = f();
+    let end = start.elapsed();
+    println!("{label}: {:?}", end);
+    result
+}
+
 fn main() {
     let mut argv = std::env::args();
     _ = argv.next();
     let file = argv.next().expect("No file was provided");
 
-    let file_content = std::fs::read_to_string(file).unwrap();
-    let toks = lexer::tokenize(&file_content).unwrap();
-    // println!("{:?}", toks);
-    let _ans = parser::parse(&toks).unwrap();
-    // println!("{}", ans);
+    let file_content = timeit("File reading", || std::fs::read_to_string(file).unwrap());
+    let toks = timeit("Tokenization", || lexer::tokenize(&file_content).unwrap());
+    let _ans = timeit("Parsing", || parser::parse(&toks).unwrap());
 }
 
 #[cfg(test)]
