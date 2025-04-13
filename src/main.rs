@@ -54,6 +54,10 @@ pub mod lexer {
         let mut chars = stream.chars().peekable();
         while let Some(&c) = chars.peek() {
             match c {
+                c if c.is_whitespace() => {
+                    chars.next();
+                    continue;
+                }
                 '{' => {
                     toks.push(Token::OpeningCurlyBrace);
                     chars.next();
@@ -65,20 +69,20 @@ pub mod lexer {
                 '"' => {
                     chars.next();
                     let mut v = Vec::new();
+                    let mut escaping = false;
+
                     while let Some(&c) = chars.peek() {
                         if !('\u{0020}'..='\u{10FFFF}').contains(&c) {
-                            return Err(format!("Invalid Character: {c}"));
+                            return Err(format!(
+                                "Invalid Character: {c}, {}",
+                                v.iter().collect::<String>()
+                            ));
                         }
-                        let mut escaping = false;
-                        if c == '\\' && v.last() != Some(&'\\') {
-                            escaping = true;
-                        }
-                        if v.last().is_some() && v.last() == Some(&'\\') && escaping {
+                        chars.next();
+                        if escaping {
                             match c {
                                 '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | 'u' | '"' => {
                                     v.push(c);
-                                    escaping = false;
-                                    chars.next();
                                 }
                                 _ => {
                                     return Err(format!(
@@ -87,17 +91,24 @@ pub mod lexer {
                                     ));
                                 }
                             }
-                        } else if c != '"' || (v.last().is_some() && *v.last().unwrap() == '\\') {
-                            v.push(c);
                             escaping = false;
-                            chars.next();
-                        } else {
+                        } else if c == '\\' {
+                            v.push(c);
+                            escaping = true;
+                        } else if c == '"' {
                             break;
+                        } else {
+                            v.push(c);
                         }
                     }
+
+                    if escaping {
+                        return Err(format!(
+                            "Unterminated escape sequence: {}",
+                            v.iter().collect::<String>()
+                        ));
+                    }
                     toks.push(Token::StringLiteral(v.iter().collect()));
-                    v.clear();
-                    chars.next();
                 }
                 ':' => {
                     toks.push(Token::Colon);
@@ -155,13 +166,7 @@ pub mod lexer {
                             .unwrap_or_else(|_| panic!("Parsing to Number failed: {digits}")),
                     ));
                 }
-                c if c.is_whitespace() => {
-                    chars.next();
-                }
                 _ => return Err(format!("Bare strings are not allowed: {c}")),
-                // _ => {
-                //     chars.next();
-                // }
             }
         }
         Ok(toks)
@@ -251,14 +256,14 @@ pub mod parser {
     fn parse_json(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
         let (parsenode, pos) = parse_element(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Json);
-        node.children.push(parsenode.clone());
+        node.children.push(parsenode);
         Ok((node, pos))
     }
 
     fn parse_element(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
         let (parsenode, pos) = parse_value(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Element);
-        node.children.push(parsenode.clone());
+        node.children.push(parsenode);
         Ok((node, pos))
     }
 
@@ -303,7 +308,7 @@ pub mod parser {
                     toks.get(pos)
                 ));
             };
-            node.children.push(parsenode.clone());
+            node.children.push(parsenode);
             Ok((node, pos + 1))
         }
     }
@@ -311,11 +316,11 @@ pub mod parser {
     fn parse_members(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
         let (parsenode, pos) = parse_member(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Members);
-        node.children.push(parsenode.clone());
+        node.children.push(parsenode);
         let mut cur_pos = pos;
         while let Some(Token::Comma) = toks.get(cur_pos) {
             let (parsenode, p) = parse_member(toks, cur_pos + 1)?;
-            node.children.push(parsenode.clone());
+            node.children.push(parsenode);
             cur_pos = p;
         }
         Ok((node, cur_pos))
@@ -344,7 +349,7 @@ pub mod parser {
         let pos = pos + 1;
         let (parsenode, pos) = parse_element(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Member(cur_token.to_owned()));
-        node.children.push(parsenode.clone());
+        node.children.push(parsenode);
         Ok((node, pos))
     }
 
@@ -363,7 +368,7 @@ pub mod parser {
                     toks.get(pos)
                 ));
             };
-            node.children.push(parsenode.clone());
+            node.children.push(parsenode);
             Ok((node, pos + 1))
         }
     }
@@ -371,11 +376,11 @@ pub mod parser {
     fn parse_elements(toks: &Vec<Token>, pos: usize) -> Result<(ParseNode, usize), String> {
         let (parsenode, pos) = parse_element(toks, pos)?;
         let mut node = ParseNode::new(GrammarItem::Elements);
-        node.children.push(parsenode.clone());
+        node.children.push(parsenode);
         let mut cur_pos = pos;
         while let Some(Token::Comma) = toks.get(cur_pos) {
             let (parsenode, p) = parse_element(toks, cur_pos + 1)?;
-            node.children.push(parsenode.clone());
+            node.children.push(parsenode);
             cur_pos = p;
         }
         Ok((node, cur_pos))
@@ -389,9 +394,9 @@ fn main() {
 
     let file_content = std::fs::read_to_string(file).unwrap();
     let toks = lexer::tokenize(&file_content).unwrap();
-    println!("{:?}", toks);
+    // println!("{:?}", toks);
     let ans = parser::parse(&toks).unwrap();
-    println!("{}", ans);
+    // println!("{}", ans);
 }
 
 #[cfg(test)]
