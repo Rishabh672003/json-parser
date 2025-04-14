@@ -119,13 +119,10 @@ fn parse_object(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String
         Ok((node, pos + 2))
     } else {
         let (parsenode, pos) = parse_members(toks, pos + 1)?;
-        let Token::ClosingCurlyBrace = toks
-            .get(pos)
-            .ok_or_else(|| "Unexpected End of input".to_string())?
-        else {
+        let Token::ClosingCurlyBrace = toks[pos] else {
             return Err(format!(
                 "invalid token while parsing object at pos: {pos} {:?}",
-                toks.get(pos)
+                toks[pos]
             ));
         };
         node.children.push(parsenode);
@@ -150,14 +147,14 @@ fn parse_member(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String
     let Token::StringLiteral(ref cur_token) = toks[pos] else {
         return Err(format!(
             "invalid token while parsing stringliteral of member at pos: {pos} {:?}",
-            toks.get(pos)
+            toks[pos]
         ));
     };
     let pos = pos + 1;
     let Token::Colon = toks[pos] else {
         return Err(format!(
             "invalid token while parsing element of member at pos: {pos} {:?}",
-            toks.get(pos)
+            toks[pos]
         ));
     };
     let pos = pos + 1;
@@ -176,7 +173,7 @@ fn parse_array(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String>
         let Token::ClosingSquareBrace = toks[pos] else {
             return Err(format!(
                 "invalid token while parsing array at pos: {pos} {:?}",
-                toks.get(pos)
+                toks[pos]
             ));
         };
         node.children.push(parsenode);
