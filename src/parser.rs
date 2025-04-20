@@ -1,4 +1,4 @@
-use crate::lexer::Token;
+use crate::lexer::{Token, TokenType};
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub enum GrammarItem<'a> {
@@ -59,9 +59,17 @@ impl ParseNode<'_> {
     pub fn new(entry: GrammarItem) -> ParseNode {
         ParseNode {
             entry,
-            children: Vec::new(),
+            children: Vec::with_capacity(1),
         }
     }
+}
+
+#[inline]
+fn error_expected(expected: &str, toks: &[Token], pos: usize) -> String {
+    format!(
+        "ERROR: Expected `{expected}`, Got: {}, at Line: {}, Col: {}",
+        toks[pos].tok, toks[pos].line, toks[pos].bol
+    )
 }
 
 pub fn parse(toks: &[Token]) -> Result<ParseNode, String> {
@@ -70,8 +78,8 @@ pub fn parse(toks: &[Token]) -> Result<ParseNode, String> {
             Ok(n)
         } else {
             Err(format!(
-                "Expected end of input, found {:?} at {}",
-                toks[i], i
+                "ERROR: Expected end of input, Got: {}, at Line: {}, Col: {}",
+                toks[i].tok, toks[i].line, toks[i].bol
             ))
         }
     })
@@ -92,38 +100,52 @@ fn parse_element(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), Strin
 }
 
 fn parse_value(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
-    let c = toks.get(pos);
+    let c = toks.get(pos).unwrap();
 
-    match c {
-        Some(Token::OpeningCurlyBrace) => {
+    match &c.tok {
+        TokenType::OpeningCurlyBrace => {
             let (parsenode, pos) = parse_object(toks, pos)?;
             Ok((parsenode, pos))
         }
-        Some(Token::OpeningSquareBrace) => {
+        TokenType::OpeningSquareBrace => {
             let (parsenode, pos) = parse_array(toks, pos)?;
             Ok((parsenode, pos))
         }
-        Some(Token::StringLiteral(val)) => Ok((ParseNode::new(GrammarItem::StrLit(val)), pos + 1)),
-        Some(Token::Number(number)) => Ok((ParseNode::new(GrammarItem::Number(*number)), pos + 1)),
-        Some(Token::True) => Ok((ParseNode::new(GrammarItem::Bool(true)), pos + 1)),
-        Some(Token::False) => Ok((ParseNode::new(GrammarItem::Bool(false)), pos + 1)),
-        Some(Token::Null) => Ok((ParseNode::new(GrammarItem::Null), pos + 1)),
-        None => Err(format!("Expected a value, found None at position: {pos}")),
-        _ => Err(format!("Invalid token: {:?} at potition: {pos}", c)),
+        TokenType::StringLiteral(val) => Ok((ParseNode::new(GrammarItem::StrLit(val)), pos + 1)),
+        TokenType::Number(number) => Ok((ParseNode::new(GrammarItem::Number(*number)), pos + 1)),
+        TokenType::True => Ok((ParseNode::new(GrammarItem::Bool(true)), pos + 1)),
+        TokenType::False => Ok((ParseNode::new(GrammarItem::Bool(false)), pos + 1)),
+        TokenType::Null => Ok((ParseNode::new(GrammarItem::Null), pos + 1)),
+        _ => Err(format!(
+            "ERROR: Invalid token, Got: {}, at Line: {}, Col: {}",
+            c.tok, c.line, c.bol
+        )),
     }
 }
 
 fn parse_object(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
     let mut node = ParseNode::new(GrammarItem::Object);
-    if let Token::ClosingCurlyBrace = toks[pos + 1] {
+    if let TokenType::ClosingCurlyBrace = toks[pos + 1].tok {
         Ok((node, pos + 2))
     } else {
         let (parsenode, pos) = parse_members(toks, pos + 1)?;
-        let Token::ClosingCurlyBrace = toks[pos] else {
-            return Err(format!(
-                "invalid token while parsing object at pos: {pos} {:?}",
-                toks[pos]
-            ));
+        let TokenType::ClosingCurlyBrace = toks[pos].tok else {
+            match toks.get(pos) {
+                Some(val) => match val.tok {
+                    TokenType::StringLiteral(_) => {
+                        return Err(error_expected(",", toks, pos));
+                    }
+                    _ => {
+                        return Err(format!(
+                            "ERROR: Invalid Token, Got: {}, at Line: {}, Col: {}",
+                            toks[pos].tok, toks[pos].line, toks[pos].bol
+                        ));
+                    }
+                },
+                None => {
+                    return Err(error_expected("}}", toks, pos));
+                }
+            }
         };
         node.children.push(parsenode);
         Ok((node, pos + 1))
@@ -135,7 +157,7 @@ fn parse_members(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), Strin
     let mut node = ParseNode::new(GrammarItem::Members);
     node.children.push(parsenode);
     let mut cur_pos = pos;
-    while let Some(Token::Comma) = toks.get(cur_pos) {
+    while let TokenType::Comma = toks.get(cur_pos).unwrap().tok {
         let (parsenode, p) = parse_member(toks, cur_pos + 1)?;
         node.children.push(parsenode);
         cur_pos = p;
@@ -144,19 +166,15 @@ fn parse_members(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), Strin
 }
 
 fn parse_member(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
-    let Token::StringLiteral(ref cur_token) = toks[pos] else {
-        return Err(format!(
-            "invalid token while parsing stringliteral of member at pos: {pos} {:?}",
-            toks[pos]
-        ));
+    let TokenType::StringLiteral(ref cur_token) = toks[pos].tok else {
+        return Err(error_expected("StringLiteral", toks, pos));
     };
+
     let pos = pos + 1;
-    let Token::Colon = toks[pos] else {
-        return Err(format!(
-            "invalid token while parsing element of member at pos: {pos} {:?}",
-            toks[pos]
-        ));
+    let TokenType::Colon = toks[pos].tok else {
+        return Err(error_expected(":", toks, pos));
     };
+
     let pos = pos + 1;
     let (parsenode, pos) = parse_element(toks, pos)?;
     let mut node = ParseNode::new(GrammarItem::Member(cur_token));
@@ -166,15 +184,24 @@ fn parse_member(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String
 
 fn parse_array(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), String> {
     let mut node = ParseNode::new(GrammarItem::Array);
-    if let Token::ClosingSquareBrace = toks[pos + 1] {
+    if let TokenType::ClosingSquareBrace = toks[pos + 1].tok {
         Ok((node, pos + 2))
     } else {
         let (parsenode, pos) = parse_elements(toks, pos + 1)?;
-        let Token::ClosingSquareBrace = toks[pos] else {
-            return Err(format!(
-                "invalid token while parsing array at pos: {pos} {:?}",
-                toks[pos]
-            ));
+        let TokenType::ClosingSquareBrace = toks[pos].tok else {
+            match toks.get(pos) {
+                Some(val) => match val.tok {
+                    TokenType::StringLiteral(_) => {
+                        return Err(error_expected(",", toks, pos));
+                    }
+                    _ => {
+                        return Err(error_expected("Token", toks, pos));
+                    }
+                },
+                None => {
+                    return Err(error_expected("]", toks, pos));
+                }
+            }
         };
         node.children.push(parsenode);
         Ok((node, pos + 1))
@@ -186,7 +213,7 @@ fn parse_elements(toks: &[Token], pos: usize) -> Result<(ParseNode, usize), Stri
     let mut node = ParseNode::new(GrammarItem::Elements);
     node.children.push(parsenode);
     let mut cur_pos = pos;
-    while let Some(Token::Comma) = toks.get(cur_pos) {
+    while let TokenType::Comma = toks.get(cur_pos).unwrap().tok {
         let (parsenode, p) = parse_element(toks, cur_pos + 1)?;
         node.children.push(parsenode);
         cur_pos = p;

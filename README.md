@@ -6,7 +6,7 @@ The parsing is done in 2 pass, In first pass Lexing is done to get the Vector of
 
 The grammar i used can be found [here](./json-grammar.md)
 
-TODO: Implement deserialization
+TODO: Implement de-serialization
 
 ## Showcase
 
@@ -20,11 +20,11 @@ Tested on a 700k line JSON [file](./test-json/huge.json)
 
 ## Things i should have done differently
 
-1. Better error handling, in tokens i should have captured there position in the file, so at the time of errors during
+1. [DONE] Better error handling, in tokens i should have captured there position in the file, so at the time of errors during
    tokenisation i could have reported them.
 2. At the time of tokenization using an iterator became a pain in the ass, just a vector of chars would have made life
    easier i think but idk.
-3. Better error handling at the time of parsing.
+3. [DONE Partially] Better error handling at the time of parsing.
 
 ## References
 

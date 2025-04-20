@@ -1,3 +1,5 @@
 {
-	"hello": 12
+    "name" : "hello"
+    "foo" : true,
+    "bar" : null,
 }
