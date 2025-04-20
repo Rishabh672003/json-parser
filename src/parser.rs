@@ -3,7 +3,6 @@ use crate::lexer::{Token, TokenType};
 #[derive(Debug, PartialEq, PartialOrd)]
 pub enum GrammarItem<'a> {
     Json,
-    Value,
     Object,
     Member(&'a str),
     Members,
@@ -34,7 +33,6 @@ impl fmt::Display for GrammarItem<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GrammarItem::Json => write!(f, "Json "),
-            GrammarItem::Value => write!(f, "Value "),
             GrammarItem::Object => write!(f, "Object "),
             GrammarItem::Member(name) => write!(f, "Member({}) ", name),
             GrammarItem::Members => write!(f, "Members "),
